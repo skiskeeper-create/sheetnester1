@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Расчёт себестоимости резки</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#fff; --text:#1d2330; --muted:#667085; --line:#e3e6eb; --accent:#1f7a4d;
+  --accent-weak:#e6f4ec; --warn:#b54708; --warn-bg:#fff4e5; --input:#fff; --calc:#f3f5f8;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#14171c; --panel:#1c2027; --text:#e6e8eb; --muted:#9aa3b2; --line:#2e333d; --accent:#4cc38a;
+  --accent-weak:#18352a; --warn:#f5a524; --warn-bg:#3a2a10; --input:#232833; --calc:#20252e; }}
+:root[data-theme="dark"]{
+  --bg:#14171c; --panel:#1c2027; --text:#e6e8eb; --muted:#9aa3b2; --line:#2e333d; --accent:#4cc38a;
+  --accent-weak:#18352a; --warn:#f5a524; --warn-bg:#3a2a10; --input:#232833; --calc:#20252e; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+h1{font-size:17px;margin:0}
+.sub{color:var(--muted);font-size:12px}
+nav{display:flex;flex-wrap:wrap;gap:4px;padding:10px 16px 0}
+nav button{border:1px solid var(--line);border-bottom:none;background:transparent;color:var(--muted);padding:8px 14px;border-radius:8px 8px 0 0;cursor:pointer;font:inherit}
+nav button.on{background:var(--panel);color:var(--text);font-weight:600}
+main{padding:0 16px 24px}
+section{display:none;background:var(--panel);border:1px solid var(--line);border-radius:0 8px 8px 8px;padding:16px}
+section.on{display:block}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+button.b{border:1px solid var(--line);background:var(--input);color:var(--text);padding:6px 12px;border-radius:6px;cursor:pointer;font:inherit}
+button.b:hover{border-color:var(--accent)}
+button.p{background:var(--accent);border-color:var(--accent);color:#fff}
+.wrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%}
+th,td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:right;white-space:nowrap}
+th{background:var(--calc);font-weight:600;font-size:12px;color:var(--muted);position:sticky;top:0}
+td.l,th.l{text-align:left}
+td.c{background:var(--calc)}
+td.w{background:var(--warn-bg);color:var(--warn)}
+input,select{width:100%;min-width:60px;border:1px solid var(--line);background:var(--input);color:var(--text);border-radius:4px;padding:4px 6px;font:inherit;text-align:right}
+input.t,select{text-align:left}
+td.l select,td.l input.t{min-width:120px}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.del{border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px}
+.del:hover{color:var(--warn)}
+.grid{display:grid;grid-template-columns:minmax(200px,340px) 160px 90px;gap:6px 12px;align-items:center;max-width:640px}
+.grid .h{font-weight:600;color:var(--muted);font-size:12px}
+.grid .v{padding:4px 6px;background:var(--calc);border-radius:4px;text-align:right}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:14px}
+.kpi div{background:var(--accent-weak);border-radius:8px;padding:10px 12px}
+.kpi b{display:block;font-size:18px}
+.kpi span{color:var(--muted);font-size:12px}
+.note{color:var(--muted);font-size:12px;margin-top:10px}
+.msg{color:var(--warn);font-size:12px;margin-top:8px}
+/* нестинг */
+.drop{border:2px dashed var(--line);border-radius:8px;padding:18px;text-align:center;color:var(--muted);cursor:pointer;margin-bottom:12px}
+.drop.over{border-color:var(--accent);background:var(--accent-weak)}
+.params{display:flex;flex-wrap:wrap;gap:10px 16px;margin:0 0 12px}
+.params label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.params input,.params select{width:120px}
+.params input.wide{width:320px}
+.thumb svg{display:block;width:56px;height:56px}
+.pf{fill:var(--accent-weak);stroke:var(--accent);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.sh{fill:none;stroke:var(--muted);stroke-width:1;vector-effect:non-scaling-stroke}
+.br{fill:#e5484d}.ld{fill:#3b82f6}
+.en{fill:#e91e63}
+.ko{fill:rgba(229,72,77,.18);stroke:#e5484d;stroke-width:1.5;stroke-dasharray:8 4;vector-effect:non-scaling-stroke}
+.kot{fill:#e5484d;font-size:40px;text-anchor:middle;dominant-baseline:middle}
+.sheets{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:10px}
+.card{border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--panel)}
+.card svg{width:100%;height:420px;background:var(--calc);border-radius:6px}
+.card .m{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6}
+.grp{margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
+.grp h3{margin:0 0 6px}
+.ok{color:var(--accent)} .muted{color:var(--muted)}
+.notice{background:var(--warn-bg);color:var(--warn);padding:12px;border-radius:8px;margin-bottom:12px}
+@media (max-width:600px){.grid{grid-template-columns:1fr 110px 60px}}
+@media print{header .bar,nav,.bar,.del{display:none}section{display:block;border:none;page-break-after:always}section:not(.pr){display:none}body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Расчёт себестоимости лазерной резки</h1>
+  <div class="sub">HSG G3050H, Raycus 3 кВт · данные хранятся в этом браузере · работает без интернета · <span id="appVer"></span></div></div>
+  <div class="bar" style="margin:0">
+    <button class="b" id="exp">Сохранить в файл</button>
+    <button class="b" id="imp">Загрузить из файла</button>
+    <button class="b" id="rst">Сбросить к таблице</button>
+    <button class="b" id="thm">Тема</button>
+    <input type="file" id="file" accept=".json" hidden>
+  </div>
+</header>
+<nav id="tabs">
+  <button data-t="nest" class="on">Нестинг</button>
+  <button data-t="calc">Расчёт</button>
+  <button data-t="modes">Режимы</button>
+  <button data-t="mats">Материалы</button>
+  <button data-t="set">Настройки</button>
+  <button data-t="price">Прайс</button>
+  <button data-t="stock">Склад</button>
+</nav>
+<main>
+<section id="nest" class="on pr">
+  <div class="notice" id="nNotice" hidden>Нестинг работает только при запуске через <b>Запуск.bat</b> (нужен Python).
+    Сейчас файл открыт напрямую — доступен только калькулятор.</div>
+  <div id="nBody">
+  <div class="drop" id="drop">Перетащите DXF-файлы сюда или <u>выберите файлы</u>
+    <div class="sub">Толщина и количество берутся из имени файла, например «7-4057 16мм 2шт.dxf»</div></div>
+  <input type="file" id="dxf" accept=".dxf" multiple hidden>
+  <div class="params" id="nParams"></div>
+  <div class="bar"><button class="b p" id="doNest">Разложить</button><button class="b" id="clrParts">Очистить список</button>
+    <span id="nStatus" class="muted" style="align-self:center"></span></div>
+  <div class="wrap"><table id="tParts"></table></div>
+  <div id="nResult"></div>
+  <div class="note">Раскладка по реальному контуру: детали вкладываются друг в друга и в отверстия, повороты 0/90/180/270°.
+    Стоимость — по формулам листа «Расчёт» с текущими «Настройками», «Материалами» и «Режимами», но длина реза и проколы —
+    по реальным контурам (проколов на контур = число мостов, минимум 1), вес — по площади детали без отверстий.
+    Для каждого листа сохраняется файл .lxds для CypCut Pro (параметры резки в CypCut выставляются по его библиотеке).</div>
+  </div>
+</section>
+<section id="calc" class="pr">
+  <div class="bar"><button class="b p" id="addPart">+ Деталь</button><button class="b" id="csv">Экспорт в CSV (Excel)</button><button class="b" id="prn">Печать</button></div>
+  <div class="wrap"><table id="tCalc"></table></div>
+  <div class="kpi" id="sum"></div>
+  <div class="note">Как в листе «Расчёт»: вес и длина реза — по габаритам (прямоугольник), проколов на деталь = 1 + отверстия.
+    Время, мин = длина реза / скорость + проколы × время прокола / 60. Стоим. материала = вес × цена кг / КПД раскроя.</div>
+</section>
+<section id="modes">
+  <div class="bar"><button class="b p" id="addMode">+ Режим</button></div>
+  <div class="wrap"><table id="tModes"></table></div>
+  <div class="msg" id="modesMsg"></div>
+  <div class="note">Станко-час = БАЗА + Потребление × Тариф + Воздух × Цена воздуха + O2 × Цена O2 + N2 × Цена N2.
+    Режим для детали подбирается по паре «материал + толщина».</div>
+</section>
+<section id="mats">
+  <div class="bar"><button class="b p" id="addMat">+ Материал</button></div>
+  <div class="wrap"><table id="tMats"></table></div>
+  <div class="note">Список толщин для детали берётся из листа «Режимы» по выбранному материалу.</div>
+</section>
+<section id="set">
+  <div class="grid" id="gSet"></div>
+</section>
+<section id="price" class="pr">
+  <h3 style="margin:0 0 4px">Стоимость лазерной резки за 1 погонный метр</h3>
+  <div class="sub" style="margin-bottom:10px">Цены в рублях без НДС. Включена резка 1 п.м и 1 прокол. Стоимость материала — отдельно.</div>
+  <div class="wrap"><table id="tPrice"></table></div>
+  <div class="note" id="cond"></div>
+</section>
+<section id="stock">
+  <div class="notice" id="sNotice" hidden>Склад работает только при запуске через <b>Запуск.bat</b> (нужен Python).</div>
+  <div id="sBody">
+  <div class="bar">
+    <button class="b p" id="sAdd">+ Лист</button>
+    <button class="b" id="sImportBtn">Импорт CSV</button>
+    <button class="b" id="sHistoryBtn">История</button>
+    <button class="b" id="sReload">Обновить</button>
+    <span class="muted" style="align-self:center" id="sMsg"></span>
+  </div>
+  <div id="sAddForm" hidden style="margin:8px 0">
+    <input id="sfMat" placeholder="Материал" list="dlMats" style="width:110px">
+    <input id="sfTh" placeholder="Толщ." type="number" step="0.5" style="width:70px">
+    <input id="sfL" placeholder="Длина" type="number" style="width:80px">
+    <input id="sfW" placeholder="Ширина" type="number" style="width:80px">
+    <input id="sfQty" placeholder="Кол-во" type="number" style="width:70px" value="1">
+    <input id="sfPrice" placeholder="Цена/лист" type="number" style="width:90px">
+    <input id="sfLoc" placeholder="Расположение" style="width:120px">
+    <input id="sfBatch" placeholder="Партия" style="width:100px">
+    <button class="b p" id="sfSave">Приход</button>
+  </div>
+  <div id="sImport" hidden style="margin:8px 0">
+    <div class="sub">CSV с заголовком: material;thickness;length;width;qty;price_sheet;price_kg;location;received;batch</div>
+    <textarea id="sCsv" rows="4" style="width:100%" placeholder="Сталь;16;3000;1500;10;12000;;стеллаж А;;"></textarea>
+    <button class="b p" id="sCsvGo">Загрузить</button>
+  </div>
+  <div id="sHist" hidden style="margin:8px 0" class="wrap"><table id="tHist"></table></div>
+  <h3 style="margin:10px 0 4px">Листы</h3>
+  <div class="wrap"><table id="tStock"></table></div>
+  <h3 style="margin:14px 0 4px">Остатки (обрезки)</h3>
+  <div class="wrap"><table id="tRemn"></table></div>
+  </div>
+</section>
+</main>
+
+<script id="core">
+// ===== Расчётное ядро: формулы листов «Настройки», «Режимы», «Расчёт», «Свод», «Прайс» =====
+const DEFAULTS = {
+  settings: { tariff: 7.5, air: 1.34, o2: 88.8, n2: 152.5, salary: 120000, hours: 167,
+              minOrder: 3000, disc: "100:5, 500:10, 1000:15",
+              articleRe: "^[A-Za-zА-Яа-я0-9]{1,6}[-_][A-Za-zА-Яа-я0-9]{1,6}$" },
+  materials: [
+    { name: "Сталь", density: 7850, price: 0 },
+    { name: "Нержавейка", density: 7900, price: 0 },
+    { name: "Алюминий", density: 2700, price: 0 } ],
+  modes: [
+    ["Сталь",0.5,"Воздух",30,0.15,12,6,75,0,0], ["Сталь",1,"Воздух",25,0.2,12,6,75,0,0],
+    ["Сталь",2,"Воздух",12,0.3,14,6,78,0,0], ["Сталь",3,"Воздух",7,0.5,14,6,80,0,0],
+    ["Сталь",4,"Воздух",3.5,0.8,16,6,85,0,0], ["Сталь",5,"O2",3,1,1,7,5,2.5,0],
+    ["Сталь",6,"O2",2.8,1.2,1.2,7,5,2.8,0], ["Сталь",8,"O2",1.6,2,1.5,7,5,3,0],
+    ["Сталь",10,"O2",1.5,2.5,1.8,7,5,3.5,0], ["Сталь",12,"O2",1,3.5,2,8,5,4,0],
+    ["Сталь",14,"O2",0.9,4,2,8,5,4.25,0], ["Сталь",16,"O2",0.8,4.5,2,8,5,4.5,0],
+    ["Сталь",18,"O2",0.7,5.5,2.5,8,5,4.75,0], ["Сталь",20,"O2",0.6,6,2.5,8,5,5,0],
+    ["Нержавейка",1,"Воздух",25,0.3,12,6,75,0,0], ["Нержавейка",1.5,"Воздух",20,0.35,12,6,75,0,0],
+    ["Нержавейка",2,"Воздух",15,0.4,14,6,78,0,0], ["Нержавейка",3,"Воздух",8,0.7,14,6,80,0,0],
+    ["Нержавейка",4,"Воздух",6,1,16,6,85,0,0], ["Нержавейка",5,"N2",3,1.3,18,8,5,0,15],
+    ["Нержавейка",6,"N2",2.5,1.6,18,8,5,0,18], ["Нержавейка",8,"N2",1.2,2.5,20,9,5,0,20],
+    ["Нержавейка",10,"N2",0.7,4.5,22,9,5,0,25], ["Алюминий",1,"Воздух",28,0.15,12,6,75,0,0],
+    ["Алюминий",2,"Воздух",12,0.3,14,6,78,0,0], ["Алюминий",3,"Воздух",7,0.5,14,6,80,0,0],
+    ["Алюминий",4,"Воздух",3.5,0.8,16,6,85,0,0], ["Алюминий",6,"N2",1.4,2,18,8,5,0,20]
+  ].map(r => ({ material:r[0], thickness:r[1], gas:r[2], speed:r[3], pierce:r[4], pressure:r[5],
+                power:r[6], air:r[7], o2:r[8], n2:r[9] })),
+  parts: [
+    { name:"", material:"Алюминий", thickness:4, qty:1, length:2757, width:1216, holes:0 },
+    { name:"", material:"Сталь", thickness:16, qty:20, length:400, width:550, holes:4 },
+    { name:"", material:"Сталь", thickness:20, qty:90, length:100, width:100, holes:1 },
+    { name:"", material:"Сталь", thickness:12, qty:12, length:300, width:300, holes:2 } ]
+};
+const num = v => { const x = parseFloat(String(v ?? "").replace(",", ".")); return isFinite(x) ? x : 0; };
+
+function derived(s) {                       // Настройки!B11, B12
+  const wage = num(s.hours) ? num(s.salary) / num(s.hours) : 0;
+  return { wage, base: wage };
+}
+function machineHour(m, s) {                // Режимы!K
+  return derived(s).base + num(m.power) * num(s.tariff) + num(m.air) * num(s.air)
+       + num(m.o2) * num(s.o2) + num(m.n2) * num(s.n2);
+}
+function gasRule(mat, t) {                  // Расчёт!N
+  if (!mat) return "";
+  if (mat === "Сталь") return t <= 4 ? "Воздух" : "O2";
+  return t <= 4 ? "Воздух" : "N2";
+}
+function findMode(modes, mat, t) { return modes.find(m => m.material === mat && num(m.thickness) === t) || null; }
+function calcPart(p, st) {                  // Расчёт!I..W
+  const t = num(p.thickness), qty = num(p.qty), L = num(p.length), W = num(p.width), holes = num(p.holes);
+  const mat = st.materials.find(m => m.name === p.material);
+  const mode = findMode(st.modes, p.material, t);
+  const has = L > 0;
+  const w1 = has && mat ? L * W * t * num(mat.density) / 1e9 : 0;
+  const weight = w1 * qty;
+  const cut1 = has ? 2 * (L + W) / 1000 : 0;
+  const cut = cut1 * qty;
+  const pierces1 = has ? 1 + holes : 0;
+  const speed = mode ? num(mode.speed) : 0, pierce = mode ? num(mode.pierce) : 0;
+  const mh = mode ? machineHour(mode, st.settings) : 0;
+  const minutes = speed === 0 ? 0 : cut / speed + pierces1 * qty * pierce / 60;
+  const hours = minutes / 60;
+  const kim = num(p.kim);                     // реальный КИМ раскладки (из нестинга); без неё — КПД 0.8 эталонной таблицы
+  const kpd = kim > 0 ? kim : 0.8;
+  const matCost = mat && kpd ? weight * num(mat.price) / kpd : 0;
+  const cutCost = hours * mh;
+  const cost = matCost + cutCost;
+  return { w1, weight, cut1, cut, pierces1, gas: mode ? mode.gas : gasRule(p.material, t), speed, pierce, mh,
+           minutes, hours, matCost, cutCost, cost, unit: qty ? cost / qty : 0,
+           problem: !has ? "нет размеров" : !mat ? "нет материала" : !mode ? "нет режима" : "" };
+}
+function summary(st) {                      // Свод
+  const r = st.parts.map(p => calcPart(p, st));
+  const s = k => r.reduce((a, x) => a + x[k], 0);
+  const qty = st.parts.reduce((a, p) => a + num(p.qty), 0);
+  return { qty, weight: s("weight"), cut: s("cut"), hours: s("hours"), cost: s("cost"),
+           avg: qty ? s("cost") / qty : 0 };
+}
+function pricePerMeter(m, s) {              // Прайс!F
+  const mh = machineHour(m, s), v = num(m.speed);
+  return v === 0 ? 0 : mh / (v * 60) + num(m.pierce) * mh / 3600;
+}
+if (typeof module !== "undefined") module.exports = { DEFAULTS, derived, machineHour, calcPart, summary, pricePerMeter, gasRule };
+</script>
+
+<script>
+// ===== Интерфейс =====
+const KEY = "cutcost.v1";
+const APP_VER = "2026-10-03.2";         // сверяется с /api/ping: рассинхрон страницы и сервера -> предупреждение
+const clone = o => JSON.parse(JSON.stringify(o));
+let st;
+try { st = JSON.parse(localStorage.getItem(KEY)) || clone(DEFAULTS); } catch (e) { st = clone(DEFAULTS); }
+for (const k of Object.keys(DEFAULTS)) if (!st[k]) st[k] = clone(DEFAULTS[k]);
+st.settings = Object.assign(clone(DEFAULTS.settings), st.settings);
+// дозаливка режимов, появившихся в справочнике после сохранения (Сталь 14/18 мм и далее):
+// localStorage старее DEFAULTS — иначе новые толщины вечно подсвечиваются «нет режима»
+for (const dm of DEFAULTS.modes)
+  if (!st.modes.some(m => m.material === dm.material && num(dm.thickness) === num(m.thickness)))
+    st.modes.push(clone(dm));
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
+
+const nf = (v, d = 2) => Number(v).toLocaleString("ru-RU", { minimumFractionDigits: d, maximumFractionDigits: d });
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const $ = id => document.getElementById(id);
+
+function inp(val, attrs, text) {
+  return `<input ${text ? 'class="t"' : 'inputmode="decimal"'} value="${esc(val)}" ${attrs}>`;
+}
+function sel(val, opts, attrs) {
+  const o = opts.includes(val) || val === "" ? opts : [val, ...opts];
+  return `<select ${attrs}>${o.map(x => `<option${x == val ? " selected" : ""}>${esc(x)}</option>`).join("")}</select>`;
+}
+
+// ---- Расчёт
+function renderCalc() {
+  const mats = st.materials.map(m => m.name);
+  let h = `<tr><th>№</th><th class="l">Деталь</th><th class="l">Материал</th><th>Толщ., мм</th><th>Кол-во</th>
+    <th>Длина, мм</th><th>Ширина, мм</th><th>Отверстий</th><th>Вес 1 дет., кг</th><th>Общий вес, кг</th>
+    <th>Рез/дет., м</th><th>Общий рез, м</th><th>Проколов/дет</th><th class="l">Газ</th><th>Скорость, м/мин</th>
+    <th>Прокол, сек</th><th>Станко-час</th><th>Время, мин</th><th>Время, ч</th><th>Стоим. матер.</th>
+    <th>Стоим. резки</th><th>Себест.</th><th>Цена за 1 шт.</th><th></th></tr>`;
+  st.parts.forEach((p, i) => {
+    const thick = [...new Set(st.modes.filter(m => m.material === p.material).map(m => num(m.thickness)))].sort((a, b) => a - b);
+    const r = calcPart(p, st), bad = r.problem ? ' class="c w" title="' + r.problem + '"' : ' class="c"';
+    const a = f => `data-p="${i}" data-f="${f}"`;
+    h += `<tr><td>${i + 1}</td><td class="l">${inp(p.name, a("name"), 1)}</td><td class="l">${sel(p.material, mats, a("material"))}</td>
+      <td>${sel(num(p.thickness), thick, a("thickness"))}</td><td>${inp(p.qty, a("qty"))}</td>
+      <td>${inp(p.length, a("length"))}</td><td>${inp(p.width, a("width"))}</td><td>${inp(p.holes, a("holes"))}</td>
+      <td class="c">${nf(r.w1, 3)}</td><td class="c">${nf(r.weight, 3)}</td><td class="c">${nf(r.cut1, 3)}</td>
+      <td class="c">${nf(r.cut, 3)}</td><td class="c">${r.pierces1}</td><td class="c l">${esc(r.gas)}</td>
+      <td${bad}>${nf(r.speed)}</td><td${bad}>${nf(r.pierce)}</td><td${bad}>${nf(r.mh)}</td>
+      <td class="c">${nf(r.minutes, 2)}</td><td class="c">${nf(r.hours, 4)}</td>
+      <td class="c"${num(p.kim) > 0 ? ` title="материал по КИМ раскладки ${nf(num(p.kim) * 100, 1)}%"` : ""}>${nf(r.matCost)}</td>
+      <td class="c">${nf(r.cutCost)}</td><td class="c"><b>${nf(r.cost)}</b></td><td class="c">${nf(r.unit)}</td>
+      <td><button class="del" data-del="parts" data-i="${i}" title="Удалить">×</button></td></tr>`;
+  });
+  $("tCalc").innerHTML = h;
+  const s = summary(st);
+  $("sum").innerHTML = [["Всего деталей", s.qty, 0], ["Общий вес, кг", s.weight, 3], ["Общая длина реза, м", s.cut, 3],
+    ["Общее время резки, ч", s.hours, 3], ["Итого себестоимость, руб.", s.cost, 2], ["Средняя себест. детали, руб.", s.avg, 2]]
+    .map(([k, v, d]) => `<div><b>${nf(v, d)}</b><span>${k}</span></div>`).join("");
+}
+
+// ---- Режимы
+const MODE_COLS = [["material","Материал",1],["thickness","Толщ., мм"],["gas","Газ",1],["speed","Скорость, м/мин"],
+  ["pierce","Прокол, сек"],["pressure","Давление, бар"],["power","Потребление, кВт"],["air","Воздух, м3/ч"],
+  ["o2","O2, м3/ч"],["n2","N2, м3/ч"]];
+function renderModes() {
+  const mats = st.materials.map(m => m.name);
+  let h = "<tr>" + MODE_COLS.map(c => `<th${c[2] ? ' class="l"' : ""}>${c[1]}</th>`).join("") + "<th>Станко-час, руб./ч</th><th></th></tr>";
+  const seen = {}, dup = [];
+  st.modes.forEach((m, i) => {
+    const k = m.material + "|" + num(m.thickness); if (seen[k]) dup.push(`${m.material} ${num(m.thickness)} мм`); seen[k] = 1;
+    const a = f => `data-m="${i}" data-f="${f}"`;
+    h += "<tr>" + MODE_COLS.map(([f]) => `<td${f === "material" || f === "gas" ? ' class="l"' : ""}>${
+      f === "material" ? sel(m.material, mats, a(f)) : f === "gas" ? sel(m.gas, ["Воздух", "O2", "N2"], a(f)) : inp(m[f], a(f))}</td>`).join("")
+      + `<td class="c"><b>${nf(machineHour(m, st.settings))}</b></td><td><button class="del" data-del="modes" data-i="${i}" title="Удалить">×</button></td></tr>`;
+  });
+  $("tModes").innerHTML = h;
+  $("modesMsg").textContent = dup.length ? "Повторяются режимы (в расчёте берётся первый): " + dup.join(", ") : "";
+}
+
+// ---- Материалы
+function renderMats() {
+  let h = `<tr><th class="l">Материал</th><th>Плотность, кг/м3</th><th>Цена, руб./кг</th><th></th></tr>`;
+  st.materials.forEach((m, i) => {
+    const a = f => `data-mt="${i}" data-f="${f}"`;
+    h += `<tr><td class="l">${inp(m.name, a("name"), 1)}</td><td>${inp(m.density, a("density"))}</td><td>${inp(m.price, a("price"))}</td>
+      <td><button class="del" data-del="materials" data-i="${i}" title="Удалить">×</button></td></tr>`;
+  });
+  $("tMats").innerHTML = h;
+}
+
+// ---- Настройки
+const SET_ROWS = [["h","Энергия и газы"],["tariff","Тариф электроэнергии","руб./кВт·ч"],["air","Цена воздуха","руб./м3"],
+  ["o2","Цена O2 (баллон 40 л / 6 м3)","руб./м3"],["n2","Цена N2 (баллон 40 л / 6 м3)","руб./м3"],["h","Оператор"],
+  ["salary","Зарплата оператора (месяц)","руб./мес."],["hours","Часов в месяц","ч"],["=wage","Зарплата в час","руб./ч"],
+  ["=base","БАЗА (без газа и электро)","руб./ч"],["h","Прайс"],
+  ["minOrder","Минимальная стоимость заказа","руб."],["disc","Скидки от объёма (п.м:%)","", 1],
+  ["h","Артикулы"],
+  ["articleRe","Шаблон артикула (regex)","ТЗ 8.4.2; текст не под шаблон — не гравируется", 1]];
+function renderSet() {
+  const d = derived(st.settings);
+  $("gSet").innerHTML = SET_ROWS.map(([k, t, u, text]) => k === "h" ? `<div class="h" style="grid-column:1/-1;margin-top:8px">${t}</div>`
+    : `<div>${t}</div>` + (k[0] === "=" ? `<div class="v">${nf(d[k.slice(1)], 6)}</div>` : `<div>${inp(st.settings[k], `data-s="${k}"`, text)}</div>`)
+      + `<div class="sub">${u}</div>`).join("");
+}
+
+// ---- Прайс
+function renderPrice() {
+  let h = `<tr><th class="l">Материал</th><th>Толщ., мм</th><th class="l">Газ</th><th>Скорость, м/мин</th><th>Станко-час, руб./ч</th><th>Цена 1 п.м + 1 прокол, руб.</th></tr>`;
+  st.modes.forEach(m => {
+    h += `<tr><td class="l">${esc(m.material)}</td><td>${num(m.thickness)}</td><td class="l">${esc(m.gas)}</td><td>${nf(m.speed)}</td>
+      <td>${nf(machineHour(m, st.settings))}</td><td><b>${nf(pricePerMeter(m, st.settings))}</b></td></tr>`;
+  });
+  $("tPrice").innerHTML = h;
+  const disc = String(st.settings.disc || "").split(",").map(x => x.split(":").map(s => s.trim())).filter(x => x.length === 2 && x[0])
+    .map(([m, p]) => `${m} п.м — ${p}%`).join(", ");
+  $("cond").innerHTML = `Цены предварительные, для оценки заказа.<br>Скидки от объёма: ${esc(disc) || "нет"}.<br>
+    Минимальная стоимость заказа — ${nf(num(st.settings.minOrder), 0)} руб.<br>Стоимость материала — отдельно: вес детали × цена за кг / КПД раскроя.`;
+}
+
+function renderAll() { renderCalc(); renderModes(); renderMats(); renderSet(); renderPrice(); }
+
+// ---- события
+document.addEventListener("change", e => {
+  const el = e.target, f = el.dataset.f, text = ["name", "material", "gas"].includes(f);
+  const v = text || el.dataset.s === "disc" || el.dataset.s === "articleRe" ? el.value : num(el.value);
+  if (el.dataset.p !== undefined) {
+    const p = st.parts[+el.dataset.p]; p[f] = v;
+    if (f === "material") {           // подставить первую доступную толщину
+      const th = st.modes.filter(m => m.material === v).map(m => num(m.thickness));
+      if (!th.includes(num(p.thickness))) p.thickness = th.length ? Math.min(...th) : 0;
+    }
+  } else if (el.dataset.m !== undefined) st.modes[+el.dataset.m][f] = v;
+  else if (el.dataset.mt !== undefined) {
+    const m = st.materials[+el.dataset.mt], old = m.name; m[f] = v;
+    if (f === "name" && old !== v) {  // переименование — обновить ссылки
+      st.modes.forEach(x => { if (x.material === old) x.material = v; });
+      st.parts.forEach(x => { if (x.material === old) x.material = v; });
+    }
+  } else if (el.dataset.s) {
+    if (el.dataset.s === "articleRe") {
+      try { new RegExp(v); } catch (x) {
+        alert("Шаблон артикула: ошибка в регулярном выражении — оставлено прежнее значение.\n" + x.message);
+        renderAll(); return;
+      }
+    }
+    st.settings[el.dataset.s] = v;
+  }
+  else return;
+  save(); renderAll();
+});
+document.addEventListener("click", e => {
+  const d = e.target.dataset;
+  if (d.del === "nParts") { nParts.splice(+d.i, 1); renderParts(); return; }
+  if (d.del) { st[d.del].splice(+d.i, 1); save(); renderAll(); }
+  if (d.t) {
+    document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b === e.target));
+    document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id === d.t));
+    try { localStorage.setItem(KEY + ".tab", d.t); } catch (x) {}
+  }
+});
+$("addPart").onclick = () => { const m = st.materials[0]?.name || ""; const t = st.modes.find(x => x.material === m);
+  st.parts.push({ name:"", material:m, thickness:t ? num(t.thickness) : 0, qty:1, length:0, width:0, holes:0 }); save(); renderAll(); };
+$("addMode").onclick = () => { st.modes.push({ material: st.materials[0]?.name || "", thickness:0, gas:"Воздух", speed:0, pierce:0,
+  pressure:0, power:0, air:0, o2:0, n2:0 }); save(); renderAll(); };
+$("addMat").onclick = () => { st.materials.push({ name:"Новый материал", density:0, price:0 }); save(); renderAll(); };
+$("rst").onclick = () => { if (confirm("Вернуть все значения к исходной таблице? Текущие изменения будут потеряны.")) { st = clone(DEFAULTS); save(); renderAll(); } };
+$("thm").onclick = () => { const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === "light"
+  : !matchMedia("(prefers-color-scheme: dark)").matches; r.dataset.theme = dark ? "dark" : "light";
+  try { localStorage.setItem(KEY + ".theme", r.dataset.theme); } catch (x) {} };
+function download(name, text, type) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$("exp").onclick = () => download("параметры_резки.json", JSON.stringify(st, null, 2), "application/json");
+$("imp").onclick = () => $("file").click();
+$("file").onchange = e => { const f = e.target.files[0]; if (!f) return; f.text().then(t => {
+  try { const o = JSON.parse(t); if (!o.settings || !o.modes || !o.materials) throw 0;
+    st = Object.assign(clone(DEFAULTS), o); st.settings = Object.assign(clone(DEFAULTS.settings), o.settings); save(); renderAll(); }
+  catch (x) { alert("Файл не распознан: нужен файл, сохранённый этой программой."); } }); e.target.value = ""; };
+$("csv").onclick = () => {
+  const H = ["№","Деталь","Материал","Толщ., мм","Кол-во","Длина, мм","Ширина, мм","Отверстий","Вес 1 дет., кг","Общий вес, кг",
+    "Рез/дет., м","Общий рез, м","Проколов/дет","Газ","Скорость, м/мин","Прокол, сек","Станко-час","Время, мин","Время, ч",
+    "Стоим. матер.","Стоим. резки","Себест.","Цена за 1 шт."];
+  const n = v => String(Math.round(v * 1e6) / 1e6).replace(".", ",");
+  const rows = st.parts.map((p, i) => { const r = calcPart(p, st);
+    return [i + 1, p.name, p.material, n(num(p.thickness)), n(num(p.qty)), n(num(p.length)), n(num(p.width)), n(num(p.holes)),
+      n(r.w1), n(r.weight), n(r.cut1), n(r.cut), r.pierces1, r.gas, n(r.speed), n(r.pierce), n(r.mh), n(r.minutes), n(r.hours),
+      n(r.matCost), n(r.cutCost), n(r.cost), n(r.unit)]; });
+  const q = v => /[;"\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v;
+  download("расчёт.csv", "﻿" + [H, ...rows].map(r => r.map(q).join(";")).join("\r\n"), "text/csv");
+};
+$("prn").onclick = () => window.print();
+// ===== Нестинг =====
+const NDEF = { sheet_w: 1500, sheet_h: 3000, margin: 10, gap: 10, res: 2.5, rotate: true, bridge_mode: "diagonal",
+               bridge_size: 1, lead_type: "arc", out_dir: "" };
+st.nest = Object.assign({}, NDEF, st.nest || {});
+let nParts = [], nRes = null;
+let nStockApplied = new Set();          // индексы групп, списанных со склада (кнопка «Списать листы»)
+const NPAR = [["sheet_w","Лист X, мм"],["sheet_h","Лист Y, мм"],["margin","Отступ от края, мм"],["gap","Зазор между деталями, мм"],
+  ["res","Шаг сетки, мм"],["rotate","Повороты 90°","bool"],["bridge_mode","Мосты","sel",[["none","нет"],["diagonal","2 по диагонали"],["all","у всех углов"]]],
+  ["bridge_size","Ширина моста, мм"],["lead_type","Врезка","sel",[["arc","дуга"],["line","линия"]]],
+  ["out_dir","Папка для .lxds (пусто — «раскрой» рядом с программой)","text"]];
+function renderNParams() {
+  $("nParams").innerHTML = NPAR.map(([k, t, ty, opts]) => `<label>${t}${
+    ty === "bool" ? `<select data-n="${k}"><option value="1"${st.nest[k] ? " selected" : ""}>да</option><option value="0"${!st.nest[k] ? " selected" : ""}>нет</option></select>`
+    : ty === "sel" ? `<select data-n="${k}">${opts.map(([v, l]) => `<option value="${v}"${st.nest[k] === v ? " selected" : ""}>${l}</option>`).join("")}</select>`
+    : `<input data-n="${k}" ${ty === "text" ? 'class="t wide"' : 'inputmode="decimal"'} value="${esc(st.nest[k])}">`}</label>`).join("");
+}
+function thickOpts(mat, cur) {
+  const th = [...new Set(st.modes.filter(m => m.material === mat).map(m => num(m.thickness)))];
+  if (cur && !th.includes(cur)) th.push(cur);
+  return th.sort((a, b) => a - b);
+}
+function renderParts() {
+  const mats = st.materials.map(m => m.name);
+  let h = `<tr><th></th><th class="l">Деталь</th><th class="l">Файл</th><th class="l">Материал</th><th>Толщ., мм</th><th>Кол-во</th>
+    <th>Габарит, мм</th><th>Отверстий</th><th>Рез/дет., м</th><th class="l">Замечания</th><th></th></tr>`;
+  nParts.forEach((p, i) => {
+    const a = f => `data-np="${i}" data-f="${f}"`;
+    if (p.error) {
+      h += `<tr><td></td><td class="l" colspan="2">${esc(p.file)}</td><td class="l w" colspan="7">Не загружен: ${esc(p.error)}</td>
+        <td><button class="del" data-del="nParts" data-i="${i}">×</button></td></tr>`;
+      return;
+    }
+    const noMode = !findMode(st.modes, p.material, num(p.thickness));
+    h += `<tr><td class="thumb">${p.svg}</td><td class="l">${inp(p.name, a("name"), 1)}</td><td class="l muted">${esc(p.file)}</td>
+      <td class="l">${sel(p.material, mats, a("material"))}</td>
+      <td${noMode ? ' class="w" title="нет режима для этой толщины"' : ""}>${sel(num(p.thickness), thickOpts(p.material, num(p.thickness)), a("thickness"))}</td>
+      <td>${inp(p.qty, a("qty"))}</td><td>${nf(p.w, 1)} × ${nf(p.h, 1)}</td><td>${p.holes}</td><td>${nf(p.cut_m, 3)}</td>
+      <td class="l muted" style="white-space:normal;max-width:260px">${esc((p.warnings || []).join("; "))}</td>
+      <td><button class="del" data-del="nParts" data-i="${i}" title="Убрать">×</button></td></tr>`;
+  });
+  $("tParts").innerHTML = nParts.length ? h : `<tr><td class="l muted">Детали не загружены</td></tr>`;
+}
+function costOf(mat, t, cut_m, pierces, area, kim) {        // формулы листа «Расчёт» на реальных метриках
+  const mode = findMode(st.modes, mat, t), m = st.materials.find(x => x.name === mat);
+  const speed = mode ? num(mode.speed) : 0, mh = mode ? machineHour(mode, st.settings) : 0;
+  const minutes = speed ? cut_m / speed + pierces * num(mode.pierce) / 60 : 0;
+  const weight = m ? area * t * num(m.density) / 1e9 : 0;
+  const kpd = num(kim) > 0 ? num(kim) : 0.8;   // реальный КИМ раскладки; иначе КПД эталона
+  const matCost = m && kpd ? weight * num(m.price) / kpd : 0, cutCost = minutes / 60 * mh;
+  return { minutes, weight, matCost, cutCost, cost: matCost + cutCost, mh, noMode: !mode };
+}
+function renderNResult() {
+  if (!nRes) { $("nResult").innerHTML = ""; return; }
+  let h = `<div class="bar" style="margin-top:14px"><span class="ok" style="align-self:center">Файлы сохранены: ${esc(nRes.out_dir)}</span>
+    <button class="b" id="openDir">Открыть папку</button></div>`;
+  for (const [gi, g] of nRes.groups.entries()) {
+    const t = g.thickness, S = st.nest.sheet_w * st.nest.sheet_h;
+    const tot = g.sheets.reduce((a, s) => ({ cut: a.cut + s.cut_m, pi: a.pi + s.pierces, ar: a.ar + s.area, n: a.n + s.count }),
+                                { cut: 0, pi: 0, ar: 0, n: 0 });
+    const c = costOf(g.material, t, tot.cut, tot.pi, tot.ar,
+                     g.sheets.length ? tot.ar / (S * g.sheets.length) : 0);
+    const m = st.materials.find(x => x.name === g.material);
+    const sheetKg = m ? S * t * num(m.density) / 1e9 : 0;
+    const kpi = [["Листов", g.sheets.length, 0], ["Деталей", tot.n, 0], ["КИМ, %", g.sheets.length ? tot.ar / (S * g.sheets.length) * 100 : 0, 1],
+      ["Длина реза, м", tot.cut, 2], ["Проколов", tot.pi, 0], ["Время резки, ч", c.minutes / 60, 2], ["Вес деталей, кг", c.weight, 1],
+      ["Вес листов, кг", sheetKg * g.sheets.length, 1], ["Стоим. резки, руб.", c.cutCost, 2], ["Стоим. материала, руб.", c.matCost, 2],
+      ["Себестоимость, руб.", c.cost, 2]];
+    h += `<div class="grp"><h3>${esc(g.material)} ${nf(t, 1)} мм</h3>
+      ${c.noMode ? `<div class="msg">Нет режима «${esc(g.material)} ${t} мм» в листе «Режимы» — время и стоимость резки не посчитаны.</div>` : ""}
+      ${g.unplaced.length ? `<div class="msg">Не помещаются на лист: ${g.unplaced.map(u => esc(u.name) + " × " + u.qty).join(", ")}</div>` : ""}
+      ${g.stock && g.stock.warning ? `<div class="msg">Склад: ${esc(g.stock.warning)}</div>` : ""}
+      <div class="bar" style="margin-top:8px">
+        <button class="b" data-stock="${gi}" ${nStockApplied.has(gi) ? "disabled" : ""}>${nStockApplied.has(gi) ? "✓ Списано со склада" : "Списать листы со склада"}</button>
+        <button class="b p" data-tocalc="${gi}">Внести в расчёт</button>
+      </div>
+      <div class="kpi">${kpi.map(([k, v, d]) => `<div><b>${nf(v, d)}</b><span>${k}</span></div>`).join("")}</div>
+      <div class="sheets">${g.sheets.map((s, i) => {
+        const cs = costOf(g.material, t, s.cut_m, s.pierces, s.area, s.utilization / 100);
+        return `<div class="card">${s.svg}<div class="m"><b>Лист ${i + 1}</b> · ${esc(s.name)}<br>деталей ${s.count} · КИМ ${nf(s.utilization, 1)}% ·
+          рез ${nf(s.cut_m, 2)} м · проколов ${s.pierces}<br>время ${nf(cs.minutes, 1)} мин · себестоимость ${nf(cs.cost)} руб.</div></div>`;
+      }).join("")}</div>
+      <div class="wrap" style="margin-top:10px"><table><tr><th class="l">Деталь</th><th>Кол-во</th><th>Рез/дет., м</th><th>Проколов/дет.</th>
+        <th>Вес 1 дет., кг</th><th>Время 1 дет., мин</th><th>Себест. 1 дет., руб.</th><th>Сумма, руб.</th></tr>
+      ${Object.entries(g.per_type).map(([k, p]) => {
+        const q = g.sheets.reduce((a, s) => a + (s.counts[k] || 0), 0);
+        const c1 = costOf(g.material, t, p.cut_m, p.pierces, p.area);
+        return `<tr><td class="l">${esc(p.name)}</td><td>${q}</td><td>${nf(p.cut_m, 3)}</td><td>${p.pierces}</td><td>${nf(c1.weight, 3)}</td>
+          <td>${nf(c1.minutes, 2)}</td><td>${nf(c1.cost)}</td><td><b>${nf(c1.cost * q)}</b></td></tr>`;
+      }).join("")}</table></div></div>`;
+  }
+  $("nResult").innerHTML = h;
+  $("openDir").onclick = () => api("/api/open", { path: nRes.out_dir }).catch(e => alert(e.message));
+}
+async function api(path, body) {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({ error: "ответ сервера не распознан" }));
+  if (!r.ok || j.error) throw new Error(j.error || r.statusText);
+  return j;
+}
+function b64(buf) {
+  let s = ""; const u = new Uint8Array(buf);
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+async function addFiles(list) {
+  const files = [...list].filter(f => /\.dxf$/i.test(f.name) && !f.name.startsWith("."));
+  if (!files.length) return;
+  $("nStatus").textContent = `Загрузка ${files.length} файлов…`;
+  try {
+    const payload = { files: await Promise.all(files.map(async f => ({ name: f.name, data: b64(await f.arrayBuffer()) }))),
+                      pattern: st.settings.articleRe || "" };
+    const r = await api("/api/import", payload);
+    for (const p of r.parts) {
+      if (!p.error) {
+        p.material = st.materials[0]?.name || "";
+        p.thickness = p.thickness ?? (thickOpts(p.material)[0] || 0);
+      }
+      nParts.push(p);
+    }
+    $("nStatus").textContent = `Загружено: ${r.parts.filter(p => !p.error).length} из ${files.length}`;
+  } catch (e) { $("nStatus").textContent = "Ошибка: " + e.message; }
+  renderParts();
+}
+$("drop").onclick = () => $("dxf").click();
+$("dxf").onchange = e => { addFiles(e.target.files); e.target.value = ""; };
+$("drop").ondragover = e => { e.preventDefault(); $("drop").classList.add("over"); };
+$("drop").ondragleave = () => $("drop").classList.remove("over");
+$("drop").ondrop = e => { e.preventDefault(); $("drop").classList.remove("over"); addFiles(e.dataTransfer.files); };
+$("clrParts").onclick = () => { nParts = []; nRes = null; renderParts(); renderNResult(); };
+$("doNest").onclick = async () => {
+  const items = nParts.filter(p => !p.error).map(p => ({ id: p.id, name: p.name, material: p.material, thickness: num(p.thickness), qty: num(p.qty) }));
+  if (!items.length) { $("nStatus").textContent = "Сначала загрузите DXF"; return; }
+  $("doNest").disabled = true; $("nStatus").textContent = "Раскладка… (может занять до минуты)";
+  const t0 = Date.now();
+  try {
+    nRes = await api("/api/nest", Object.assign({}, st.nest, { items }));
+    nStockApplied = new Set();
+    $("nStatus").textContent = `Готово за ${((Date.now() - t0) / 1000).toFixed(1)} с`;
+  } catch (e) { $("nStatus").textContent = "Ошибка: " + e.message; }
+  $("doNest").disabled = false; renderNResult();
+};
+document.addEventListener("change", e => {
+  const el = e.target;
+  if (el.dataset.n) {
+    const k = el.dataset.n;
+    st.nest[k] = k === "rotate" ? el.value === "1" : ["bridge_mode", "lead_type", "out_dir"].includes(k) ? el.value : num(el.value);
+    save();
+  }
+  if (el.dataset.np !== undefined) {
+    const p = nParts[+el.dataset.np], f = el.dataset.f;
+    p[f] = ["name", "material"].includes(f) ? el.value : num(el.value);
+    if (f === "material") { const th = thickOpts(p.material); if (!th.includes(num(p.thickness))) p.thickness = th[0] || 0; }
+    renderParts();
+  }
+});
+const _renderAll = renderAll;
+renderAll = function () { _renderAll(); renderParts(); renderNResult(); };
+if (location.protocol === "file:") { $("nNotice").hidden = false; $("nBody").hidden = true;
+  $("sNotice").hidden = false; $("sBody").hidden = true; }
+
+// ===== Склад (ТЗ разд. 9) =====
+// Предупреждение при уходе с вкладки «Нестинг», если раскладка не перенесена на склад
+document.getElementById("tabs").addEventListener("click", (e) => {
+  const t = e.target.closest("button")?.dataset.t;
+  if (t && t !== "nest" && nRes && nRes.groups.some((g, i) => !nStockApplied.has(i))
+      && !confirm("Остатки не перенесены на склад. Перейти без переноса?")) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}, true);
+
+// Кнопки результата нестинга: «Списать листы со склада» и «Внести в расчёт»
+$("nResult").addEventListener("click", async (e) => {
+  const bs = e.target.closest("[data-stock]");
+  if (bs) {
+    const gi = +bs.dataset.stock, g = nRes.groups[gi];
+    const xs = g.sheets.map(s => s.ext);
+    const used = [Math.max(...xs.map(x => x[1][0] - x[0][0])), Math.max(...xs.map(x => x[1][1] - x[0][1]))];
+    try {
+      const r = await api("/api/stock/apply", { material: g.material, thickness: g.thickness,
+        sheet_l: num(st.nest.sheet_w), sheet_w: num(st.nest.sheet_h), count: g.sheets.length,
+        used, source: nRes.out_dir });
+      nStockApplied.add(gi);
+      alert(`Списано листов: ${r.spent} из ${r.requested}` + (r.remnant ? `\nОстаток на складе: ${r.remnant}` : "")
+            + (r.spent < r.requested ? "\nВНИМАНИЕ: на складе не хватило листов!" : ""));
+      renderNResult();
+    } catch (err) { alert(err.message); }
+    return;
+  }
+  const bt = e.target.closest("[data-tocalc]");
+  if (bt) toCalc(nRes.groups[+bt.dataset.tocalc]);
+});
+
+function toCalc(g) {
+  const del = confirm("Удалить предыдущие данные из расчёта?\n«ОК» — удалить старые и внести новые\n«Отмена» — добавить новые к старым");
+  if (del) st.parts = [];
+  const S = num(st.nest.sheet_w) * num(st.nest.sheet_h);
+  const ar = g.sheets.reduce((a, s) => a + s.area, 0);
+  const kim = g.sheets.length ? ar / (S * g.sheets.length) : 0;      // реальный КИМ раскладки
+  for (const [k, p] of Object.entries(g.per_type)) {
+    const q = g.sheets.reduce((a, s) => a + (s.counts[k] || 0), 0);
+    st.parts.push({ name: p.name, material: g.material, thickness: num(g.thickness), qty: q,
+                    length: Math.round(p.bbox[0]), width: Math.round(p.bbox[1]), holes: p.holes || 0,
+                    kim: Math.round(kim * 10000) / 10000 });
+  }
+  save(); renderAll();
+  document.querySelector('nav button[data-t="calc"]').click();
+}
+
+async function loadStock() {
+  try {
+    const r = await api("/api/stock/list", {});
+    $("tStock").innerHTML = "<tr><th>Материал</th><th>Толщ.</th><th>Размер</th><th>Кол-во</th>"
+      + "<th>Цена/лист</th><th>Расположение</th><th>Партия</th><th>Приход</th><th></th></tr>"
+      + r.sheets.map(s => `<tr><td>${s.material}</td><td>${s.thickness}</td><td>${s.length}×${s.width}</td>`
+        + `<td>${s.qty}</td><td>${s.price_sheet || ""}</td><td>${s.location || ""}</td><td>${s.batch || ""}</td>`
+        + `<td>${s.received || ""}</td>`
+        + `<td><button class="b" data-wo="sheets:${s.id}:${s.qty}">Списать</button></td></tr>`).join("");
+    $("tRemn").innerHTML = "<tr><th>Материал</th><th>Толщ.</th><th>Размер</th><th>Кол-во</th><th>Источник</th><th>Дата</th><th></th></tr>"
+      + (r.remnants.length ? r.remnants.map(s => `<tr><td>${s.material}</td><td>${s.thickness}</td>`
+        + `<td>${s.length}×${s.width}</td><td>${s.qty}</td><td>${s.source || ""}</td><td>${s.created || ""}</td>`
+        + `<td><button class="b" data-wo="remnants:${s.id}:${s.qty}">Списать</button></td></tr>`).join("")
+        : "<tr><td colspan=7 class='muted'>пусто — остатки появляются после раскладок со склада</td></tr>");
+    $("sMsg").textContent = `листов: ${r.sheets.reduce((a, s) => a + s.qty, 0)}, обрезков: ${r.remnants.reduce((a, s) => a + s.qty, 0)}`;
+  } catch (e) { $("sMsg").textContent = "Ошибка: " + e.message; }
+}
+$("sReload").onclick = loadStock;
+$("sAdd").onclick = () => { $("sAddForm").hidden = !$("sAddForm").hidden; };
+$("sImportBtn").onclick = () => { $("sImport").hidden = !$("sImport").hidden; };
+$("sHistoryBtn").onclick = async () => {
+  $("sHist").hidden = !$("sHist").hidden;
+  if ($("sHist").hidden) return;
+  const r = await api("/api/stock/history", { limit: 200 });
+  $("tHist").innerHTML = "<tr><th>Время</th><th>Операция</th><th>Объект</th><th>ID</th><th>Δ</th><th>Остаток</th><th>Основание</th></tr>"
+    + r.history.map(h => `<tr><td>${h.ts}</td><td>${h.kind}</td><td>${h.item}</td><td>${h.item_id || ""}</td>`
+      + `<td>${h.delta}</td><td>${h.balance}</td><td>${h.reason || ""}</td></tr>`).join("");
+};
+$("sfSave").onclick = async () => {
+  try {
+    await api("/api/stock/add", { row: { material: $("sfMat").value.trim(), thickness: num($("sfTh").value),
+      length: num($("sfL").value), width: num($("sfW").value), qty: num($("sfQty").value) || 1,
+      price_sheet: num($("sfPrice").value), location: $("sfLoc").value.trim(), batch: $("sfBatch").value.trim() } });
+    $("sAddForm").hidden = true; loadStock();
+  } catch (e) { alert(e.message); }
+};
+$("sCsvGo").onclick = async () => {
+  try {
+    const r = await api("/api/stock/import", { text: $("sCsv").value });
+    alert(`Загружено: ${r.ok}` + (r.errors.length ? "\nОшибки:\n" + r.errors.join("\n") : ""));
+    $("sImport").hidden = true; loadStock();
+  } catch (e) { alert(e.message); }
+};
+document.getElementById("stock").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-wo]");
+  if (!b) return;
+  const [table, id, max] = b.dataset.wo.split(":");
+  const qty = prompt(`Списать (максимум ${max}):`, "1");
+  if (!qty) return;
+  try {
+    await api("/api/stock/writeoff", { table, id: +id, qty: num(qty), reason: "ручное списание" });
+    loadStock();
+  } catch (err) { alert(err.message); }
+});
+document.querySelector('nav button[data-t="stock"]').addEventListener("click", loadStock);
+renderNParams();
+if (location.protocol !== "file:")          // версия сервера: показать и поймать рассинхрон страницы/сервера
+  fetch("/api/ping").then(r => r.json()).then(j => {
+    if (!j || !j.ok) return;
+    $("appVer").textContent = "версия " + (j.ver || "?");
+    if (j.ver && j.ver !== APP_VER)
+      $("nStatus").textContent = "⚠ Сервер версии " + j.ver + ", а страница — " + APP_VER
+        + ". Перезапустите программу (ярлык SheetNester) и обновите страницу (F5).";
+  }).catch(() => {});
+try { const t = localStorage.getItem(KEY + ".theme"); if (t) document.documentElement.dataset.theme = t;
+  const tab = localStorage.getItem(KEY + ".tab"); if (tab) document.querySelector(`nav button[data-t="${tab}"]`)?.click(); } catch (x) {}
+renderAll();
+</script>
+</body>
+</html>
